@@ -9,13 +9,12 @@ from vtkmodules.vtkInteractionStyle import (
 )
 # noinspection PyUnresolvedReferences
 import vtkmodules.vtkRenderingOpenGL2
-from vtkmodules.vtkCommonColor import vtkNamedColors
 from vtkmodules.vtkCommonCore import vtkPoints
 from vtkmodules.vtkCommonTransforms import(
 	vtkTransform,
 	vtkLinearTransform
 	)
-from vtkmodules.vtkCommonDataModel import vtkPolyData
+from vtkmodules.vtkCommonDataModel import vtkPolyData, vtkPiecewiseFunction
 from vtkmodules.vtkFiltersProgrammable import vtkProgrammableGlyphFilter
 from vtkmodules.vtkFiltersGeneral import(
 	vtkTransformFilter,
@@ -31,18 +30,18 @@ from vtkmodules.vtkRenderingCore import (
     vtkPolyDataMapper,
     vtkRenderWindow,
     vtkRenderWindowInteractor,
-    vtkRenderer
+    vtkRenderer,
+	vtkColorTransferFunction,
+    vtkVolume,
+	vtkVolumeProperty
 )
+from vtkmodules.vtkIOImage import vtkNIFTIImageReader
+from vtkmodules.vtkRenderingVolumeOpenGL2 import vtkSmartVolumeMapper
+from vtkmodules.vtkCommonColor import vtkNamedColors
 
-# Import SimpleITK if possible
-try:
-    import SimpleITK as sitk
-    print("SimpleITK imported")
-except ImportError:
-    sitk = None
-    print("SimpleITK is not available")
+# TODO: Add arrows representing X, Y and Z
 
-def render_scene(lut:np.ndarray, scanner_desc:dict, image_desc:dict=None):
+def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
 	colors = vtkNamedColors()
 
 	# Create the scanner actor
@@ -74,31 +73,47 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_desc:dict=None):
 	actor.SetMapper(mapper)
 	actor.GetProperty().SetColor(colors.GetColor3d('White'))
 
-	if(image_desc != None):
-		# Create the Image surface actor
-		# Create cube.
-		volume = vtkCubeSource()
-		volume.SetXLength(image_desc["length_x"])
-		volume.SetYLength(image_desc["length_y"])
-		volume.SetZLength(image_desc["length_z"])
-		volume.SetCenter([
-			image_desc["off_x"],
-			image_desc["off_y"],
-			image_desc["off_z"]])
-		volume.Update()
+	renderer = vtkRenderer()
 
-		# mapper
-		volumeMapper = vtkPolyDataMapper()
-		volumeMapper.SetInputData(volume.GetOutput())
+	if(image_fname is not None):
 
-		# Actor.
-		volumeActor = vtkActor()
-		volumeActor.GetProperty().EdgeVisibilityOn()
-		volumeActor.SetMapper(volumeMapper)
-		volumeActor.GetProperty().SetColor(colors.GetColor3d('DimGray'))
+		# Step 1: Load volumetric data (e.g., from a .vtk or .nii file)
+		# For demonstration, we use a VTK sample source (you'll use your actual data reader)
+		reader = vtkNIFTIImageReader()  # Change to appropriate reader (e.g., for NIfTI)
+		reader.SetFileName(image_fname)  # Path to your volumetric image file
+		reader.Update()
+
+		# Step 2: Create a volume mapper and specify how to map the data
+		volume_mapper = vtkSmartVolumeMapper()
+		volume_mapper.SetInputConnection(reader.GetOutputPort())
+
+		# Step 3: Set volume properties (e.g., opacity, shading)
+		volume_property = vtkVolumeProperty()
+		volume_property.ShadeOn()
+		volume_property.SetInterpolationTypeToLinear()
+
+		# Opacity transfer function (to control transparency)
+		opacity_transfer_function = vtkPiecewiseFunction()
+		opacity_transfer_function.AddPoint(0, 0.0)  # Completely transparent for low values
+		opacity_transfer_function.AddPoint(50, 1.0)  # Fully opaque for high values
+		volume_property.SetScalarOpacity(opacity_transfer_function)
+
+		# Color transfer function (to control color based on intensity)
+		color_transfer_function = vtkColorTransferFunction()
+		color_transfer_function.AddRGBPoint(0, 0.0, 0.0, 0.0)  # Black for low intensity
+		color_transfer_function.AddRGBPoint(50, 1.0, 1.0, 1.0)  # White for high intensity
+		volume_property.SetColor(color_transfer_function)
+
+		# Step 4: Create a volume actor and set its mapper and properties
+		volume = vtkVolume()
+		volume.SetMapper(volume_mapper)
+		volume.SetProperty(volume_property)
+
+		renderer.AddVolume(volume)
+
+
 
 	# Create a renderer, render window, and interactor.
-	renderer = vtkRenderer()
 	ren_win = vtkRenderWindow()
 	ren_win.AddRenderer(renderer)
 	ren_win.SetWindowName('Rendering a scanner')
@@ -109,13 +124,11 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_desc:dict=None):
 
 	# Camera management
 	camera = vtkCamera()
-	camera.SetPosition(2*max(lut[:,0]), 2*max(lut[:,1]), 2*max(lut[:,2]))
+	camera.SetPosition(2*np.max(lut[:,0]), 2*np.max(lut[:,1]), 2*np.max(lut[:,2]))
 	camera.SetFocalPoint(0, 0, 0)
 
 	# Add the actor to the scene.
 	renderer.AddActor(actor)
-	if image_desc!=None:
-		renderer.AddActor(volumeActor)
 	renderer.SetActiveCamera(camera)
 	renderer.SetBackground(colors.GetColor3d('black'))
 
@@ -153,7 +166,7 @@ class CalcGlyph(object):
 
 # Main
 if(__name__=='__main__'):
-	
+
 	lut  = np.fromfile('MOUSE.lut', dtype=np.float32).reshape([-1,6])
 
 	scanner_desc = dict()
@@ -161,26 +174,4 @@ if(__name__=='__main__'):
 	scanner_desc["crystalSize_trans"] = 1.1
 	scanner_desc["crystalDepth"] = 1.06
 
-	if sitk is not None:
-		image_desc = dict()
-		sitk_img = sitk.ReadImage("test_image_MOUSE.nii")
-
-		image_length = [0.0] * 3
-		for i in range(3):
-			image_length[i] = sitk_img.GetSize()[i] * sitk_img.GetSpacing()[i]
-
-		image_offset = [0.0] * 3
-		for i in range(3):
-			image_offset[i] = sitk_img.GetOrigin()[i] + image_length[i]/2.0 - sitk_img.GetSpacing()[i] / 2.0
-
-		image_desc["length_x"] = image_length[0]
-		image_desc["length_y"] = image_length[1]
-		image_desc["length_z"] = image_length[2]
-		image_desc["off_x"] = image_offset[0]
-		image_desc["off_y"] = image_offset[1]
-		image_desc["off_z"] = image_offset[2]
-
-	else:
-		image_desc = None
-
-	render_scene(lut, scanner_desc, image_desc)
+	render_scene(lut, scanner_desc, "test_image_MOUSE.nii")
