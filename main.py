@@ -50,9 +50,6 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
     # Create points.
     points = vtkPoints()
     for i in range(lut.shape[0]):
-        x = lut[i][0]
-        y = lut[i][1]
-        z = lut[i][2]
         points.InsertNextPoint(lut[i][0],lut[i][1],lut[i][2])
 
     # Combine into a polydata.
