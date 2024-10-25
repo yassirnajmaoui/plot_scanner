@@ -1,6 +1,7 @@
 #!/bin/env python
 import numpy as np
 import pyvista as pv
+import argparse
 import json
 
 # noinspection PyUnresolvedReferences
@@ -182,11 +183,29 @@ class CalcGlyph(object):
 # Main
 if(__name__=='__main__'):
 
-	lut  = np.fromfile('GE.lut', dtype=np.float32).reshape([-1,6])
+	# Set up argument parser
+	parser = argparse.ArgumentParser(description="Render a scene based on LUT, scanner description parameters and, optionally, an image.")
 
-	scanner_desc = dict()
-	scanner_desc["crystalSize_z"] = 5.311
-	scanner_desc["crystalSize_trans"] = 3.95
-	scanner_desc["crystalDepth"] = 25
+	# Add arguments for each of the parameters
+	parser.add_argument('--lut', type=str, required=True, help="Path to the LUT file (e.g., 'MYSCANNER.lut').")
+	parser.add_argument('--crystalSize_z', type=float, required=True, help="Crystal size in the z direction.")
+	parser.add_argument('--crystalSize_trans', type=float, required=True, help="Crystal size in the transverse direction.")
+	parser.add_argument('--crystalDepth', type=float, required=True, help="Depth of the crystal.")
+	parser.add_argument('--image', type=str, required=False, help="Path to the image file (e.g., 'test_image_GE.nii').")
 
-	render_scene(lut, scanner_desc, "test_image_GE.nii")
+	# Parse the arguments
+	args = parser.parse_args()
+
+	# Read the LUT file
+	lut = np.fromfile(args.lut, dtype=np.float32).reshape([-1,6])
+
+	# Create scanner description dictionary
+	scanner_desc = {
+		"crystalSize_z": args.crystalSize_z,
+		"crystalSize_trans": args.crystalSize_trans,
+		"crystalDepth": args.crystalDepth
+	}
+
+	# Call the render function with the provided arguments
+	render_scene(lut, scanner_desc, args.image)
+
