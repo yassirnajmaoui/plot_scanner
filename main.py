@@ -38,6 +38,7 @@ from vtkmodules.vtkRenderingCore import (
 from vtkmodules.vtkIOImage import vtkNIFTIImageReader
 from vtkmodules.vtkRenderingVolumeOpenGL2 import vtkSmartVolumeMapper
 from vtkmodules.vtkCommonColor import vtkNamedColors
+from vtkmodules.vtkCommonMath import vtkMatrix4x4
 
 # TODO: Add arrows representing X, Y and Z
 
@@ -83,6 +84,19 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
 		reader.SetFileName(image_fname)  # Path to your volumetric image file
 		reader.Update()
 
+		nifti_matrix = reader.GetQFormMatrix()  # or GetSFormMatrix() if applicable
+
+		# Convert the affine matrix from NIFTI to a VTK matrix
+		affine_matrix = vtkMatrix4x4()
+		if nifti_matrix:
+			affine_matrix.DeepCopy(nifti_matrix)
+		# Get the max value of the image
+		image_data = reader.GetOutput()
+		scalars = image_data.GetPointData().GetScalars()
+		np_scalars = np.array(scalars)
+		mean_val = np.mean(np_scalars)
+		max_val = np.max(np_scalars)
+
 		# Step 2: Create a volume mapper and specify how to map the data
 		volume_mapper = vtkSmartVolumeMapper()
 		volume_mapper.SetInputConnection(reader.GetOutputPort())
@@ -95,19 +109,20 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
 		# Opacity transfer function (to control transparency)
 		opacity_transfer_function = vtkPiecewiseFunction()
 		opacity_transfer_function.AddPoint(0, 0.0)  # Completely transparent for low values
-		opacity_transfer_function.AddPoint(50, 1.0)  # Fully opaque for high values
+		opacity_transfer_function.AddPoint(max_val/3, 1.0)  # Fully opaque for high values
 		volume_property.SetScalarOpacity(opacity_transfer_function)
 
 		# Color transfer function (to control color based on intensity)
 		color_transfer_function = vtkColorTransferFunction()
 		color_transfer_function.AddRGBPoint(0, 0.0, 0.0, 0.0)  # Black for low intensity
-		color_transfer_function.AddRGBPoint(50, 1.0, 1.0, 1.0)  # White for high intensity
+		color_transfer_function.AddRGBPoint(mean_val, 1.0, 0.75, 0.0)  # White for high intensity
 		volume_property.SetColor(color_transfer_function)
 
 		# Step 4: Create a volume actor and set its mapper and properties
 		volume = vtkVolume()
 		volume.SetMapper(volume_mapper)
 		volume.SetProperty(volume_property)
+		volume.SetUserMatrix(affine_matrix)  # Apply the NIFTI affine transformation
 
 		renderer.AddVolume(volume)
 
@@ -167,11 +182,11 @@ class CalcGlyph(object):
 # Main
 if(__name__=='__main__'):
 
-	lut  = np.fromfile('MOUSE.lut', dtype=np.float32).reshape([-1,6])
+	lut  = np.fromfile('GE.lut', dtype=np.float32).reshape([-1,6])
 
 	scanner_desc = dict()
-	scanner_desc["crystalSize_z"] = 1.1
-	scanner_desc["crystalSize_trans"] = 1.1
-	scanner_desc["crystalDepth"] = 1.06
+	scanner_desc["crystalSize_z"] = 5.311
+	scanner_desc["crystalSize_trans"] = 3.95
+	scanner_desc["crystalDepth"] = 25
 
-	render_scene(lut, scanner_desc, "test_image_MOUSE.nii")
+	render_scene(lut, scanner_desc, "test_image_GE.nii")
