@@ -42,17 +42,6 @@ except ImportError:
     sitk = None
     print("SimpleITK is not available")
 
-
-def read_scanner_lut(filepath: str):
-	lut = np.fromfile(filepath, dtype=np.float32)
-	lut = lut.reshape([-1,6])
-	return lut
-
-def read_json(filepath:str):
-	with open(filepath) as json_file:
-		data = json.load(json_file)
-	return data
-
 def render_scene(lut:np.ndarray, scanner_desc:dict, image_desc:dict=None):
 	colors = vtkNamedColors()
 
@@ -92,7 +81,10 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_desc:dict=None):
 		volume.SetXLength(image_desc["length_x"])
 		volume.SetYLength(image_desc["length_y"])
 		volume.SetZLength(image_desc["length_z"])
-		volume.SetCenter([image_desc["off_x"],image_desc["off_y"],image_desc["off_z"]])
+		volume.SetCenter([
+			image_desc["off_x"],
+			image_desc["off_y"],
+			image_desc["off_z"]])
 		volume.Update()
 
 		# mapper
@@ -161,12 +153,34 @@ class CalcGlyph(object):
 
 # Main
 if(__name__=='__main__'):
-	lut  = read_scanner_lut('MOUSE.lut')
+	
+	lut  = np.fromfile('MOUSE.lut', dtype=np.float32).reshape([-1,6])
+
 	scanner_desc = dict()
 	scanner_desc["crystalSize_z"] = 1.1
 	scanner_desc["crystalSize_trans"] = 1.1
 	scanner_desc["crystalDepth"] = 1.06
 
-	image_desc = read_json('img_params_MOUSE.json')
+	if sitk is not None:
+		image_desc = dict()
+		sitk_img = sitk.ReadImage("test_image_MOUSE.nii")
+
+		image_length = [0.0] * 3
+		for i in range(3):
+			image_length[i] = sitk_img.GetSize()[i] * sitk_img.GetSpacing()[i]
+
+		image_offset = [0.0] * 3
+		for i in range(3):
+			image_offset[i] = sitk_img.GetOrigin()[i] + image_length[i]/2.0 - sitk_img.GetSpacing()[i] / 2.0
+
+		image_desc["length_x"] = image_length[0]
+		image_desc["length_y"] = image_length[1]
+		image_desc["length_z"] = image_length[2]
+		image_desc["off_x"] = image_offset[0]
+		image_desc["off_y"] = image_offset[1]
+		image_desc["off_z"] = image_offset[2]
+
+	else:
+		image_desc = None
 
 	render_scene(lut, scanner_desc, image_desc)
