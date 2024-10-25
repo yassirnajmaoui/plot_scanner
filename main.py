@@ -191,7 +191,7 @@ if(__name__=='__main__'):
 	parser.add_argument('--crystalSize_z', type=float, required=True, help="Crystal size in the z direction.")
 	parser.add_argument('--crystalSize_trans', type=float, required=True, help="Crystal size in the transverse direction.")
 	parser.add_argument('--crystalDepth', type=float, required=True, help="Depth of the crystal.")
-	parser.add_argument('--image', type=str, required=False, help="Path to the image file (e.g., 'test_image_GE.nii').")
+	parser.add_argument('--image', type=str, required=False, help="Path to the NIFTI image file (e.g., 'my_image.nii').")
 
 	# Parse the arguments
 	args = parser.parse_args()
