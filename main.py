@@ -23,7 +23,7 @@ from vtkmodules.vtkFiltersGeneral import(
 from vtkmodules.vtkFiltersSources import (
     vtkConeSource,
     vtkCubeSource,
-    vtkSphereSource,
+    vtkArrowSource,
 )
 from vtkmodules.vtkRenderingCore import (
     vtkActor,
@@ -41,7 +41,40 @@ from vtkmodules.vtkRenderingVolumeOpenGL2 import vtkSmartVolumeMapper
 from vtkmodules.vtkCommonColor import vtkNamedColors
 from vtkmodules.vtkCommonMath import vtkMatrix4x4
 
-# TODO: Add arrows representing X, Y and Z
+
+def create_arrow(color, direction, arrow_length):
+    """
+    Creates an arrow actor with a specified color and direction.
+    :param color: Color for the arrow in RGB format.
+    :param direction: A tuple representing the (x, y, z) direction of the arrow.
+    :return: Configured arrow actor.
+    """
+    # Create arrow source
+    arrow_source = vtkArrowSource()
+
+    # Transform to orient the arrow in the specified direction
+    transform = vtkTransform()
+    transform.Scale(arrow_length, arrow_length, arrow_length)
+    if direction == (1, 0, 0):  # X-axis (no rotation needed)
+        pass
+    elif direction == (0, 1, 0):  # Y-axis
+        transform.RotateZ(90)
+    elif direction == (0, 0, 1):  # Z-axis
+        transform.RotateY(-90)
+
+    transform_filter = vtkTransformPolyDataFilter()
+    transform_filter.SetInputConnection(arrow_source.GetOutputPort())
+    transform_filter.SetTransform(transform)
+
+    # Create a mapper and actor
+    arrow_mapper = vtkPolyDataMapper()
+    arrow_mapper.SetInputConnection(transform_filter.GetOutputPort())
+
+    arrow_actor = vtkActor()
+    arrow_actor.SetMapper(arrow_mapper)
+    arrow_actor.GetProperty().SetColor(color)
+
+    return arrow_actor
 
 def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
     colors = vtkNamedColors()
@@ -124,7 +157,19 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
 
         renderer.AddVolume(volume)
 
+    max_lut_x = np.max(lut[:,0])
+    max_lut_y = np.max(lut[:,1])
+    max_lut_z = np.max(lut[:,2])
 
+    # Add X-Y-Z arrows
+    colors = vtkNamedColors()
+    red = colors.GetColor3d("Red")
+    green = colors.GetColor3d("Green")
+    blue = colors.GetColor3d("Blue")
+    arrow_length = ( 1 / 3 )*((max_lut_x + max_lut_y + max_lut_z) / 3) # X-Y-Z arrows are set to 1/3 the scanner radius
+    x_arrow = create_arrow(red, (1, 0, 0), arrow_length)   # X-axis (red)
+    y_arrow = create_arrow(green, (0, 1, 0), arrow_length) # Y-axis (green)
+    z_arrow = create_arrow(blue, (0, 0, 1), arrow_length)  # Z-axis (blue)
 
     # Create a renderer, render window, and interactor.
     ren_win = vtkRenderWindow()
@@ -137,11 +182,14 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
 
     # Camera management
     camera = vtkCamera()
-    camera.SetPosition(2*np.max(lut[:,0]), 2*np.max(lut[:,1]), 2*np.max(lut[:,2]))
+    camera.SetPosition(2*max_lut_x, 2*max_lut_y, 2*max_lut_z)
     camera.SetFocalPoint(0, 0, 0)
 
     # Add the actor to the scene.
     renderer.AddActor(actor)
+    renderer.AddActor(x_arrow)
+    renderer.AddActor(y_arrow)
+    renderer.AddActor(z_arrow)
     renderer.SetActiveCamera(camera)
     renderer.SetBackground(colors.GetColor3d('black'))
 
