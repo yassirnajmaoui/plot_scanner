@@ -41,7 +41,6 @@ from vtkmodules.vtkRenderingVolumeOpenGL2 import vtkSmartVolumeMapper
 from vtkmodules.vtkCommonColor import vtkNamedColors
 from vtkmodules.vtkCommonMath import vtkMatrix4x4
 
-
 def create_arrow(color, direction, arrow_length):
     """
     Creates an arrow actor with a specified color and direction.
@@ -109,10 +108,9 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
 
     if(image_fname is not None):
 
-        # Step 1: Load volumetric data (e.g., from a .vtk or .nii file)
-        # For demonstration, we use a VTK sample source (you'll use your actual data reader)
-        reader = vtkNIFTIImageReader()  # Change to appropriate reader (e.g., for NIfTI)
-        reader.SetFileName(image_fname)  # Path to your volumetric image file
+        # Load volumetric data (e.g., from a .vtk or .nii file)
+        reader = vtkNIFTIImageReader()
+        reader.SetFileName(image_fname)
         reader.Update()
 
         nifti_matrix = reader.GetQFormMatrix()
@@ -123,6 +121,12 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
         affine_matrix = vtkMatrix4x4()
         if nifti_matrix:
             affine_matrix.DeepCopy(nifti_matrix)
+        # Flip X axis because of convention (Although not sure why it's not done automatically by VTK)
+        affine_matrix.SetElement(0, 0, -affine_matrix.GetElement(0, 0))
+        affine_matrix.SetElement(0, 1, -affine_matrix.GetElement(0, 1))
+        affine_matrix.SetElement(0, 2, -affine_matrix.GetElement(0, 2))
+        affine_matrix.SetElement(0, 3, -affine_matrix.GetElement(0, 3))
+
         # Get the max value of the image
         image_data = reader.GetOutput()
         scalars = image_data.GetPointData().GetScalars()
@@ -130,25 +134,26 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
         mean_val = np.mean(np_scalars)
         max_val = np.max(np_scalars)
 
-        # Step 2: Create a volume mapper and specify how to map the data
+        # Create a volume mapper and specify how to map the data
         volume_mapper = vtkSmartVolumeMapper()
         volume_mapper.SetInputConnection(reader.GetOutputPort())
 
-        # Step 3: Set volume properties (e.g., opacity, shading)
+        # Set volume properties (e.g., opacity, shading)
         volume_property = vtkVolumeProperty()
         volume_property.ShadeOn()
         volume_property.SetInterpolationTypeToLinear()
 
         # Opacity transfer function (to control transparency)
+        max_opacity = max_val/3
         opacity_transfer_function = vtkPiecewiseFunction()
         opacity_transfer_function.AddPoint(0, 0.0)  # Completely transparent for low values
-        opacity_transfer_function.AddPoint(max_val/3, 1.0)  # Fully opaque for high values
+        opacity_transfer_function.AddPoint(max_opacity, 1.0)  # Fully opaque for high values
         volume_property.SetScalarOpacity(opacity_transfer_function)
 
         # Color transfer function (to control color based on intensity)
         color_transfer_function = vtkColorTransferFunction()
         color_transfer_function.AddRGBPoint(0, 0.0, 0.0, 0.0)  # Black for low intensity
-        color_transfer_function.AddRGBPoint(mean_val, 1.0, 0.75, 0.0)  # White for high intensity
+        color_transfer_function.AddRGBPoint(mean_val, 1.0, 0.75, 0.0)  # Orange-yellow for high intensity
         volume_property.SetColor(color_transfer_function)
 
         # Step 4: Create a volume actor and set its mapper and properties
