@@ -1,8 +1,6 @@
 #!/bin/env python
 import numpy as np
-import pyvista as pv
 import argparse
-import json
 
 # noinspection PyUnresolvedReferences
 from vtkmodules.vtkInteractionStyle import (
