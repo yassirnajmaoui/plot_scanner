@@ -8,12 +8,14 @@ from vtkmodules.vtkInteractionStyle import (
 )
 # noinspection PyUnresolvedReferences
 import vtkmodules.vtkRenderingOpenGL2
-from vtkmodules.vtkCommonCore import vtkPoints
+from vtkmodules.vtkCommonCore import(
+    vtkPoints
+)
 from vtkmodules.vtkCommonTransforms import(
     vtkTransform,
     vtkLinearTransform
     )
-from vtkmodules.vtkCommonDataModel import vtkPolyData, vtkPiecewiseFunction
+from vtkmodules.vtkCommonDataModel import vtkPolyData, vtkPiecewiseFunction, vtkColor3d
 from vtkmodules.vtkFiltersProgrammable import vtkProgrammableGlyphFilter
 from vtkmodules.vtkFiltersGeneral import(
     vtkTransformFilter,
@@ -37,7 +39,9 @@ from vtkmodules.vtkRenderingCore import (
 from vtkmodules.vtkIOImage import vtkNIFTIImageReader
 from vtkmodules.vtkRenderingVolumeOpenGL2 import vtkSmartVolumeMapper
 from vtkmodules.vtkCommonColor import vtkNamedColors
-from vtkmodules.vtkCommonMath import vtkMatrix4x4
+from vtkmodules.vtkCommonMath import(
+    vtkMatrix4x4
+)
 
 def create_arrow(color, direction, arrow_length):
     """
@@ -73,7 +77,7 @@ def create_arrow(color, direction, arrow_length):
 
     return arrow_actor
 
-def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
+def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None, maxval_frac=3, image_color=(1.0,0.75,0.0), background_color=(0,0,0), crystal_color=(1,1,1)):
     colors = vtkNamedColors()
 
     # Create the scanner actor
@@ -100,7 +104,7 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
     mapper.SetInputConnection(glyph_filter.GetOutputPort())
     actor = vtkActor()
     actor.SetMapper(mapper)
-    actor.GetProperty().SetColor(colors.GetColor3d('White'))
+    actor.GetProperty().SetColor(vtkColor3d(crystal_color))
 
     renderer = vtkRenderer()
 
@@ -129,7 +133,6 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
         image_data = reader.GetOutput()
         scalars = image_data.GetPointData().GetScalars()
         np_scalars = np.array(scalars)
-        mean_val = np.mean(np_scalars)
         max_val = np.max(np_scalars)
 
         # Create a volume mapper and specify how to map the data
@@ -142,7 +145,7 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
         volume_property.SetInterpolationTypeToLinear()
 
         # Opacity transfer function (to control transparency)
-        max_opacity = max_val/3
+        max_opacity = max_val/maxval_frac
         opacity_transfer_function = vtkPiecewiseFunction()
         opacity_transfer_function.AddPoint(0, 0.0)  # Completely transparent for low values
         opacity_transfer_function.AddPoint(max_opacity, 1.0)  # Fully opaque for high values
@@ -151,7 +154,7 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
         # Color transfer function (to control color based on intensity)
         color_transfer_function = vtkColorTransferFunction()
         color_transfer_function.AddRGBPoint(0, 0.0, 0.0, 0.0)  # Black for low intensity
-        color_transfer_function.AddRGBPoint(mean_val, 1.0, 0.75, 0.0)  # Orange-yellow for high intensity
+        color_transfer_function.AddRGBPoint(max_val, image_color[0], image_color[1], image_color[2])  # Orange-yellow for high intensity
         volume_property.SetColor(color_transfer_function)
 
         # Step 4: Create a volume actor and set its mapper and properties
@@ -167,7 +170,6 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
     max_lut_z = np.max(lut[:,2])
 
     # Add X-Y-Z arrows
-    colors = vtkNamedColors()
     red = colors.GetColor3d("Red")
     green = colors.GetColor3d("Green")
     blue = colors.GetColor3d("Blue")
@@ -196,7 +198,7 @@ def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None):
     renderer.AddActor(y_arrow)
     renderer.AddActor(z_arrow)
     renderer.SetActiveCamera(camera)
-    renderer.SetBackground(colors.GetColor3d('black'))
+    renderer.SetBackground(vtkColor3d(background_color[0],background_color[1],background_color[2]))
 
     # Render and interact.
     ren_win.Render()
@@ -237,11 +239,24 @@ if(__name__=='__main__'):
     parser = argparse.ArgumentParser(description="Render a scene based on LUT, scanner description parameters and, optionally, an image.")
 
     # Add arguments for each of the parameters
-    parser.add_argument('--lut', type=str, required=True, help="Path to the LUT file (e.g., 'MYSCANNER.lut').")
-    parser.add_argument('--crystalSize_z', type=float, required=True, help="Crystal size in the z direction.")
-    parser.add_argument('--crystalSize_trans', type=float, required=True, help="Crystal size in the transverse direction.")
-    parser.add_argument('--crystalDepth', type=float, required=True, help="Depth of the crystal.")
-    parser.add_argument('--image', type=str, required=False, help="Path to the NIFTI image file (e.g., 'my_image.nii').")
+    parser.add_argument('--lut', type=str, required=True,
+                        help="Path to the LUT file (e.g., 'MYSCANNER.lut').")
+    parser.add_argument('--crystalSize_z', type=float, required=True,
+                        help="Crystal size in the z direction.")
+    parser.add_argument('--crystalSize_trans', type=float, required=True,
+                        help="Crystal size in the transverse direction.")
+    parser.add_argument('--crystalDepth', type=float, required=True,
+                        help="Depth of the crystal.")
+    parser.add_argument('--image', type=str, required=False,
+                        help="Path to the NIFTI image file (e.g., 'my_image.nii').")
+    parser.add_argument('--maxval_frac', type=float, required=False, default=3,
+                        help="Fraction of the max value of the image to use for the display (Default: 3)")
+    parser.add_argument('--image_color', type=str, required=False, default='1.0,0.75,0',
+                        help="Color of the image (RGB) with values ranging from 0.0 to 1.0. Format: \"R,G,B\"")
+    parser.add_argument('--crystal_color', type=str, required=False, default='1,1,1',
+                        help="Color of the crystals (RGB) with values ranging from 0.0 to 1.0. Format: \"R,G,B\"")
+    parser.add_argument('--background_color', type=str, required=False, default='0.0,0.0,0.0',
+                        help="Color of the background (RGB) with values ranging from 0.0 to 1.0. Format: \"R,G,B\"")
 
     # Parse the arguments
     args = parser.parse_args()
@@ -256,6 +271,10 @@ if(__name__=='__main__'):
         "crystalDepth": args.crystalDepth
     }
 
+    image_color = [float(s) for s in args.image_color.split(',')]
+    background_color = [float(s) for s in args.background_color.split(',')]
+    crystal_color = [float(s) for s in args.crystal_color.split(',')]
+
     # Call the render function with the provided arguments
-    render_scene(lut, scanner_desc, args.image)
+    render_scene(lut, scanner_desc, args.image, args.maxval_frac, image_color, background_color, crystal_color)
 
