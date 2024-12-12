@@ -77,7 +77,13 @@ def create_arrow(color, direction, arrow_length):
 
     return arrow_actor
 
-def render_scene(lut:np.ndarray, scanner_desc:dict, image_fname:str=None, maxval_frac=3, image_color=(1.0,0.75,0.0), background_color=(0,0,0), crystal_color=(1,1,1)):
+def render_scene(lut:np.ndarray,
+                 scanner_desc:dict,
+                 image_fname:str=None,
+                 maxval_frac:float=3,
+                 image_color=(1.0,0.75,0.0),
+                 background_color=(0,0,0),
+                 crystal_color=(1,1,1)):
     colors = vtkNamedColors()
 
     # Create the scanner actor
