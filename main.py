@@ -213,9 +213,9 @@ def render_scene(lut:np.ndarray,
 
 
 class CalcGlyph(object):
-    def __init__(self, glyph_filter, lut, desc):
+    def __init__(self, glyph_filter, lut_masked, desc):
         self.glyph_filter = glyph_filter
-        self.lut  = lut
+        self.lut  = lut_masked
         self.desc = desc
         self.scale = [desc['crystalDepth'],desc['crystalSize_trans'],desc['crystalSize_z']]
 
@@ -247,6 +247,7 @@ if(__name__=='__main__'):
     # Add arguments for each of the parameters
     parser.add_argument('--lut', type=str, required=True,
                         help="Path to the LUT file (e.g., 'MYSCANNER.lut').")
+    parser.add_argument('--det_mask', help='Path to detector mask array.')
     parser.add_argument('--crystalSize_z', type=float, required=True,
                         help="Crystal size in the z direction.")
     parser.add_argument('--crystalSize_trans', type=float, required=True,
@@ -269,6 +270,12 @@ if(__name__=='__main__'):
 
     # Read the LUT file
     lut = np.fromfile(args.lut, dtype=np.float32).reshape([-1,6])
+    if args.det_mask is not None:
+        mask = np.fromfile(args.det_mask, dtype=bool)
+        if mask.ndim != 1 or mask.size != len(lut):
+            raise RuntimeError(
+                'Detector mask size does not match lookup table.')
+        lut = lut[mask]
 
     # Create scanner description dictionary
     scanner_desc = {
@@ -283,4 +290,3 @@ if(__name__=='__main__'):
 
     # Call the render function with the provided arguments
     render_scene(lut, scanner_desc, args.image, args.maxval_frac, image_color, background_color, crystal_color)
-
