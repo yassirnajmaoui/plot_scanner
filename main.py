@@ -248,11 +248,11 @@ if(__name__=='__main__'):
     parser.add_argument('--lut', type=str, required=True,
                         help="Path to the LUT file (e.g., 'MYSCANNER.lut').")
     parser.add_argument('--det_mask', help='Path to detector mask array.')
-    parser.add_argument('--crystalSize_z', type=float, required=True,
+    parser.add_argument('--cz', dest='cz', type=float,
                         help="Crystal size in the z direction.")
-    parser.add_argument('--crystalSize_trans', type=float, required=True,
+    parser.add_argument('--ctrans', dest='ctrans', type=float,
                         help="Crystal size in the transverse direction.")
-    parser.add_argument('--crystalDepth', type=float, required=True,
+    parser.add_argument('--cdepth', dest='cdepth', type=float, required=True,
                         help="Depth of the crystal.")
     parser.add_argument('--image', type=str, required=False,
                         help="Path to the NIFTI image file (e.g., 'my_image.nii').")
@@ -278,10 +278,22 @@ if(__name__=='__main__'):
         lut = lut[mask]
 
     # Create scanner description dictionary
+    if args.cz is None and args.ctrans is not None:
+        ctrans = args.ctrans
+        cz = args.ctrans
+    elif args.cz is not None and args.ctrans is None:
+        ctrans = args.cz
+        cz = args.cz
+    elif args.cz is not None and args.ctrans is not None:
+        cz = args.cz
+        ctrans = args.ctrans
+    else:
+        raise ValueError("Need to specify crystal size")
+
     scanner_desc = {
-        "crystalSize_z": args.crystalSize_z,
-        "crystalSize_trans": args.crystalSize_trans,
-        "crystalDepth": args.crystalDepth
+        "crystalSize_z": cz,
+        "crystalSize_trans": ctrans,
+        "crystalDepth": args.cdepth
     }
 
     image_color = [float(s) for s in args.image_color.split(',')]
