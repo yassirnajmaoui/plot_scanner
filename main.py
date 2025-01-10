@@ -79,6 +79,7 @@ def create_arrow(color, direction, arrow_length):
 
 def render_scene(lut:np.ndarray,
                  scanner_desc:dict,
+                 show_arrows:bool=True,
                  image_fname:str=None,
                  maxval_frac:float=3,
                  image_color=(1.0,0.75,0.0),
@@ -176,13 +177,14 @@ def render_scene(lut:np.ndarray,
     max_lut_z = np.max(lut[:,2])
 
     # Add X-Y-Z arrows
-    red = colors.GetColor3d("Red")
-    green = colors.GetColor3d("Green")
-    blue = colors.GetColor3d("Blue")
-    arrow_length = ( 1 / 3 )*((max_lut_x + max_lut_y + max_lut_z) / 3) # X-Y-Z arrows are set to 1/3 the scanner radius
-    x_arrow = create_arrow(red, (1, 0, 0), arrow_length)   # X-axis (red)
-    y_arrow = create_arrow(green, (0, 1, 0), arrow_length) # Y-axis (green)
-    z_arrow = create_arrow(blue, (0, 0, 1), arrow_length)  # Z-axis (blue)
+    if show_arrows:
+        red = colors.GetColor3d("Red")
+        green = colors.GetColor3d("Green")
+        blue = colors.GetColor3d("Blue")
+        arrow_length = ( 1 / 3 )*((max_lut_x + max_lut_y + max_lut_z) / 3) # X-Y-Z arrows are set to 1/3 the scanner radius
+        x_arrow = create_arrow(red, (1, 0, 0), arrow_length)   # X-axis (red)
+        y_arrow = create_arrow(green, (0, 1, 0), arrow_length) # Y-axis (green)
+        z_arrow = create_arrow(blue, (0, 0, 1), arrow_length)  # Z-axis (blue)
 
     # Create a renderer, render window, and interactor.
     ren_win = vtkRenderWindow()
@@ -200,9 +202,10 @@ def render_scene(lut:np.ndarray,
 
     # Add the actor to the scene.
     renderer.AddActor(actor)
-    renderer.AddActor(x_arrow)
-    renderer.AddActor(y_arrow)
-    renderer.AddActor(z_arrow)
+    if show_arrows:
+        renderer.AddActor(x_arrow)
+        renderer.AddActor(y_arrow)
+        renderer.AddActor(z_arrow)
     renderer.SetActiveCamera(camera)
     renderer.SetBackground(vtkColor3d(background_color[0],background_color[1],background_color[2]))
 
@@ -264,6 +267,8 @@ if(__name__=='__main__'):
                         help="Color of the crystals (RGB) with values ranging from 0.0 to 1.0. Format: \"R,G,B\"")
     parser.add_argument('--background_color', type=str, required=False, default='0.0,0.0,0.0',
                         help="Color of the background (RGB) with values ranging from 0.0 to 1.0. Format: \"R,G,B\"")
+    parser.add_argument('--hide_arrows', action='store_true',
+                        help="Hide X-Y-Z arrows")
 
     # Parse the arguments
     args = parser.parse_args()
@@ -301,4 +306,10 @@ if(__name__=='__main__'):
     crystal_color = [float(s) for s in args.crystal_color.split(',')]
 
     # Call the render function with the provided arguments
-    render_scene(lut, scanner_desc, args.image, args.maxval_frac, image_color, background_color, crystal_color)
+    render_scene(lut, scanner_desc,
+                 not args.hide_arrows,
+                 args.image,
+                 args.maxval_frac,
+                 image_color,
+                 background_color,
+                 crystal_color)
