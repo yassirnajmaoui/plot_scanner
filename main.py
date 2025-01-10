@@ -161,7 +161,10 @@ def render_scene(lut:np.ndarray,
         # Color transfer function (to control color based on intensity)
         color_transfer_function = vtkColorTransferFunction()
         color_transfer_function.AddRGBPoint(0, 0.0, 0.0, 0.0)  # Black for low intensity
-        color_transfer_function.AddRGBPoint(max_val, image_color[0], image_color[1], image_color[2])  # Orange-yellow for high intensity
+        color_transfer_function.AddRGBPoint(max_val,
+                                            image_color[0],
+                                            image_color[1],
+                                            image_color[2])  # Color for high intensity
         volume_property.SetColor(color_transfer_function)
 
         # Step 4: Create a volume actor and set its mapper and properties
@@ -207,7 +210,9 @@ def render_scene(lut:np.ndarray,
         renderer.AddActor(y_arrow)
         renderer.AddActor(z_arrow)
     renderer.SetActiveCamera(camera)
-    renderer.SetBackground(vtkColor3d(background_color[0],background_color[1],background_color[2]))
+    renderer.SetBackground(vtkColor3d(background_color[0],
+                                      background_color[1],
+                                      background_color[2]))
 
     # Render and interact.
     ren_win.Render()
@@ -262,7 +267,7 @@ if(__name__=='__main__'):
     parser.add_argument('--maxval_frac', type=float, required=False, default=3,
                         help="Fraction of the max value of the image to use for the display (Default: 3)")
     parser.add_argument('--image_color', type=str, required=False, default='1.0,0.75,0',
-                        help="Color of the image (RGB) with values ranging from 0.0 to 1.0. Format: \"R,G,B\"")
+                        help="Color of the image (RGB) with values ranging from 0 to 255. Format: \"R,G,B\"")
     parser.add_argument('--crystal_color', type=str, required=False, default='1,1,1',
                         help="Color of the crystals (RGB) with values ranging from 0.0 to 1.0. Format: \"R,G,B\"")
     parser.add_argument('--background_color', type=str, required=False, default='0.0,0.0,0.0',
